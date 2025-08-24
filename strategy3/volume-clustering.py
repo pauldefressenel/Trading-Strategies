@@ -5,14 +5,14 @@ from matplotlib.ticker import MaxNLocator
 
 class VolumeClustering: 
 
-    def __init__(self, dfs, coin, dic_param): 
+    def __init__(self, df_dic, dic_param, coin): 
 
-        self.open = dfs['open'][coin.upper()]
-        self.close = dfs['close'][coin.upper()]
-        self.high = dfs['high'][coin.upper()]
-        self.low = dfs['low'][coin.upper()]
-        self.volume = dfs['volume'][coin.upper()]
-        self.returns = dfs['return'][coin.upper()]
+        self.open = df_dic['open'][coin.upper()]
+        self.close = df_dic['close'][coin.upper()]
+        self.high = df_dic['high'][coin.upper()]
+        self.low = df_dic['low'][coin.upper()]
+        self.volume = df_dic['volume'][coin.upper()]
+        self.returns = df_dic['return'][coin.upper()]
         
         self.df = pd.concat([self.open, self.high, self.low, self.volume, self.returns], axis=1)
         self.df.columns = ['open', 'high', 'low', 'volume', 'returns']
@@ -155,9 +155,25 @@ class VolumeClustering:
         plt.tight_layout()
         plt.show()
 
-if __name__ =='__main__':
+if __name__ == '__main__':
 
     symbols = ['ADA', 'AVAX', 'BNB', 'BTC', 'DOGE', 'ETH', 'SOL', 'XRP']
-    params = {'half_life': '2D', 'n_bins': 5, 'band_pct': 0.05, 'lookback': 10, 'fee': 0.002}
+    training_df_dic, validation_df_dic = data.get_data()
+  
+    dic_param = {
+        'half_life': '2D', 
+        'n_bins': 5, 
+        'band_pct': 0.05, 
+        'lookback': 10, 
+        'fee': 0.002
+    }
 
-
+    # Get performance metrics using strategy-toolbox.py
+    strat = VolumeClustering(training_df_dic, '1T')
+    weight_df = strat.get_weight(dic_param)
+  
+    metric, perf = st.strat_eval(training_df_dic, weight_df)
+    indicator = st.get_strat_metrics(metric, 'strat')
+    st.plot_equity_curve(training_df_dic, perf)
+    st.plot_drawdown(perf)
+    plt.show()
