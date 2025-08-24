@@ -8,10 +8,6 @@ import strategy_toolbox as st
 class PivotPoints:
 
     def __init__(self, dfs: dict):
-        required = {'open', 'high', 'low', 'close'}
-        missing = required - set(dfs.keys())
-        if missing:
-            raise ValueError(f"dfs missing required keys: {missing}")
 
         self.open_df = dfs['open'].copy()
         self.high_df = dfs['high'].copy()
@@ -27,27 +23,6 @@ class PivotPoints:
         self.tickers = list(self.open_df.columns)
         self.index = self.open_df.index
         self.dfs = dfs 
-
-    @staticmethod
-    def _param_for_ticker(dic_param, ticker):
-
-        if dic_param is None:
-            raise ValueError("dic_param must be provided.")
-        if isinstance(dic_param, dict) and ticker in dic_param and isinstance(dic_param[ticker], dict):
-            p = dic_param[ticker]
-        else:
-            p = dic_param
-
-        p = {
-            'shift_signal': int(p.get('shift_signal', 1)),
-            'take_profit': float(p.get('take_profit', 0.10)),
-            'stop_loss'  : float(p.get('stop_loss', 0.03)),
-        }
-        if p['shift_signal'] < 0:
-            raise ValueError("shift_signal must be >= 0")
-        if p['take_profit'] <= 0 or p['stop_loss'] <= 0:
-            raise ValueError("take_profit and stop_loss must be > 0")
-        return p
 
     def get_weight(self, dic_param: dict) -> pd.DataFrame:
 
@@ -82,15 +57,7 @@ class PivotPoints:
 
         return weight_df
 
-    def sharpe_heatmap(self,
-                       shift_signal_range,
-                       take_profit_range,
-                       stop_loss=0.02,
-                       eval_module=None):
-
-        if eval_module is None:
-            import strategy_toolbox as st
-            eval_module = st
+    def sharpe_heatmap(self, shift_signal_range, take_profit_range, stop_loss=0.02):
 
         heatmap_data = []
 
@@ -132,32 +99,11 @@ class PivotPoints:
 
         return df_heatmap, heatmap_matrix
 
-    def random_search(self,
-                      n: int = 1000,
-                      shift_min: int = 1,
-                      shift_max: int = 100,
-                      tp_grid=None,
-                      sl_grid=None,
-                      eval_module=None,
-                      top_k: int = 20,
-                      seed: int = None) -> pd.DataFrame:
-
-        if eval_module is None:
-            import strategy_toolbox as st
-            eval_module = st
-
-        if seed is not None:
-            random.seed(seed)
-            np.random.seed(seed)
-
-        if tp_grid is None:
-            tp_grid = np.round(np.linspace(0.01, 0.30, 50), 3).tolist()
-        if sl_grid is None:
-            sl_grid = np.round(np.linspace(0.01, 0.30, 50), 3).tolist()
+    def random_search(self, shift_min, shift_max, top_k):
 
         results = []
 
-        for _ in range(int(n)):
+        for _ in range(int(1000)):
             shift_signal = random.randint(int(shift_min), int(shift_max))
             take_profit = float(random.choice(tp_grid))
             stop_loss = float(random.choice(sl_grid))
@@ -211,11 +157,10 @@ if __name__ == '__main__':
     indicator = st.get_strat_metrics(metric, 'strat')
     st.plot_equity_curve(training_df_dic, perf)
     st.plot_drawdown(perf)
-    plt.show()
 
     # Optimize parameters using heatmap and random search 
     sharpe_heatmap(range(60, 80), np.round(np.linspace(0.01, 0.2, 20), 3).tolist())
-    random_search()
+    random_search(shift_min = 1, shift_max = 100, top_k = 20)
 
 
 
