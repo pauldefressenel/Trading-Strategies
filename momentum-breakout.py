@@ -8,7 +8,7 @@ import strategy_toolbox as st
 from matplotlib.ticker import MaxNLocator
 from matplotlib import cm
 
-class VolumeClustering: 
+class MomentumBreakout: 
 
     def __init__(self, dfs, time): 
 
@@ -212,7 +212,7 @@ if __name__ == '__main__':
       'mtd_shift': 3
     }
   
-    strat = VolumeClustering(training_df_dic, '1T')
+    strat = MomentumBreakout(training_df_dic, '1T')
     weight_df = strat.get_weight(dic_param)
   
     metric, perf = st.strat_eval(training_df_dic, weight_df)
