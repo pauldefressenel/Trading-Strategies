@@ -3,22 +3,33 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
-class VolumeClustering: 
 
-    def __init__(self, df_dic, dic_param, coin): 
 
-        self.open = df_dic['open'][coin.upper()]
-        self.close = df_dic['close'][coin.upper()]
-        self.high = df_dic['high'][coin.upper()]
-        self.low = df_dic['low'][coin.upper()]
-        self.volume = df_dic['volume'][coin.upper()]
-        self.returns = df_dic['return'][coin.upper()]
+class VolumeClustering:
+    
+    def __init__(self, dfs: dict, params: dict, coin: str):
         
-        self.df = pd.concat([self.open, self.high, self.low, self.volume, self.returns], axis=1)
-        self.df.columns = ['open', 'high', 'low', 'volume', 'returns']
-        self.df.index = pd.to_datetime(self.df.index)
+        c = coin.upper()
+        
+        self.df = pd.concat({
+            "open": dfs["open"][c],
+            "high": dfs["high"][c],
+            "low": dfs["low"][c],
+            "close": dfs["close"][c],
+            "volume": dfs["volume"][c],
+            "returns": dfs["return"][c]
+        }, axis=1).astype(float).sort_index()
 
-        self.params = dic_param 
+        self.df.index = pd.to_datetime(self.df.index)
+        
+        self.open = self.df["open"]
+        self.high = self.df["high"]
+        self.low = self.df["low"]
+        self.close = self.df["close"]
+        self.volume = self.df["volume"]
+        self.returns = self.df["returns"]
+
+        self.params = params
     
     def get_hist_window(self, window, n_bins = None):
 
