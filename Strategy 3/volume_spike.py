@@ -1,105 +1,156 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import random
+import strategy-toolbox as st
+import data 
 
-param = {'window': 30,
-'shift': 4,
-'scalar': 8,
-'take_profit': 0.10,
-'stop_loss': 0.05
-}
+class MomentumBreakout:
+  
+    def __init__(self, dfs, time):
 
-def main(df_dic, param):
+        self.open = dfs['open'].resample(time).first()
+        self.high = dfs['high'].resample(time).max()
+        self.volume = dfs['volume'].resample(time).sum()
 
-window = param['window']
-shift = param['shift']
-scalar = param['scalar']
-take_profit = param['take_profit']
-stop_loss = param['stop_loss']
+        self.dfs = dfs
 
-open_df, high_df, volume_df = df_dic['open'], df_dic['high'], df_dic['volume']
+    def get_weight(self, param):
+      
+        window = param['window']
+        shift = param['shift']
+        scalar = param['scalar']
+        take_profit = param['take_profit']
+        stop_loss = param['stop_loss']
 
-max_high_df = high_df.rolling(window = window, min_periods = window).max()
-mean_volume_df = volume_df.rolling(window = window, min_periods = window).mean()
+        open_df = self.open
+        high_df = self.high
+        volume_df = self.volume
 
-moment_df = (high_df > max_high_df.shift(shift)).astype(int)
-volume_spike_df = (volume_df > scalar * mean_volume_df.shift(shift)).astype(int)
-entry_df = moment_df * volume_spike_df
+        max_high_df = high_df.rolling(window=window, min_periods=window).max()
+        mean_volume_df = volume_df.rolling(window=window, min_periods=window).mean()
 
-entry_price_df = (entry_df.shift() * open_df).replace(0, np.nan).ffill().fillna(0)
-stop_df = (open_df < entry_price_df * (1 - stop_loss)).astype(int)
-take_profit_df = (open_df > entry_price_df * (1 + take_profit)).astype(int)
-exit_df = np.sign(take_profit_df + stop_df)
+        moment_df = (high_df > max_high_df.shift(shift)).astype(int)
+        volume_spike_df = (volume_df > scalar * mean_volume_df.shift(shift)).astype(int)
+        entry_df = moment_df * volume_spike_df
 
-signal_df = (entry_df - exit_df).replace(0, np.nan).ffill().replace(-1, 0).fillna(0)
-weight_df = (signal_df / signal_df.shape[1]).shift().fillna(0)
+        entry_price_df = (entry_df.shift() * open_df).replace(0, np.nan).ffill().fillna(0)
+        stop_df = (open_df < entry_price_df * (1 - stop_loss)).astype(int)
+        take_profit_df = (open_df > entry_price_df * (1 + take_profit)).astype(int)
+        exit_df = np.sign(take_profit_df + stop_df)
 
-return weight_df
+        signal_df = (entry_df - exit_df).replace(0, np.nan).ffill().replace(-1, 0).fillna(0)
+        # equally-weight across active signals
+        weight_df = (signal_df / signal_df.shape[1]).shift().fillna(0)
 
-def random_search():
+        return weight_df
 
-results = []
-n = 1000
+    def random_search(self):
+      
+        results = []
+        n = 1000
 
-for i in range(n):
+        for _ in range(n):
+            window = random.randint(1, 100)
+            shift = random.randint(1, 100)
+            scalar = random.randint(1, 20)
 
-window = random.randint(1, 100)
-shift = random.randint(1, 100)
-scalar = random.randint(1, 20)
+            param = {
+                'window': window,
+                'shift': shift,
+                'scalar': scalar,
+                'take_profit': 0.10,
+                'stop_loss': 0.05
+            }
 
-param = {'window': window,
-'shift': shift,
-'scalar': scalar,
-'take_profit': 0.10,
-'stop_loss': 0.05
-}
-weight_df = main(training_df_dic, param)
+            weight_df = self.main(param)
 
-metric, _ = u.strat_eval(training_df_dic, weight_df)
-indicator = u.get_strat_metrics(metric, 'strat')
+            metric, _ = st.strat_eval(self.dfs, weight_df)
+            indicator = st.get_strat_metrics(metric, 'strat')
 
-indicator['window'] = window
-indicator['shift'] = shift
-indicator['scalar'] = scalar
+            indicator['window'] = window
+            indicator['shift'] = shift
+            indicator['scalar'] = scalar
 
-results.append(indicator)
-result_df = pd.DataFrame(results)
-result_df = result_df[['sharpe_fees', 'window', 'shift', 'scalar']]
+            results.append(indicator)
 
-return result_df.sort_values(by = 'sharpe_fees', ascending=False).head(20)
+        result_df = pd.DataFrame(results)
+        result_df = result_df[['sharpe_fees', 'window', 'shift', 'scalar']]
 
-random_search()
+        return result_df.sort_values(by='sharpe_fees', ascending=False).head(20)
 
-def sharpe_heatmap(window_vol_range, window_high_range):
+    def sharpe_heatmap(self, window_vol_range, window_high_range):
+      
+        heatmap_data = []
+        return_df = self.dfs['return']
+        window = 25
 
-heatmap_data = []
-return_df = training_df_dic['return']
-window = 25
+        for window_vol in window_vol_range:
+            for window_high in window_high_range:
 
-for window_vol in window_vol_range:
-for window_high in window_high_range:
+                param = {
+                    'window': window,
+                    'window_vol': window_vol,
+                    'window_high': window_high
+                }
 
-param = {'window': window,
-'window_vol': window_vol,
-'window_high': window_high
-}
+                weight_df = self.main(param)
+                metric, _ = st.strat_eval_hourly(return_df, weight_df)
+                indicator = st.get_strat_metrics(metric)
 
-weight_df = main(training_df_dic, param)
-metric, _ = u.strat_eval_hourly(return_df, weight_df)
-indicator = u.get_strat_metrics(metric)
+                indicator['window'] = window
+                indicator['window_vol'] = window_vol
+                indicator['window_high'] = window_high
 
-indicator['window'] = window
-indicator['window_vol'] = window_vol
-indicator['window_high'] = window_high
+                sharpe = indicator['sharpe_fees']
+                heatmap_data.append({
+                    'window_vol': window_vol,
+                    'window_high': window_high,
+                    'sharpe_ratio': sharpe
+                })
 
-sharpe = indicator['sharpe_fees']
-heatmap_data.append({'window_vol': window_vol, 'window_high': window_high, 'sharpe_ratio': sharpe})
-df_heatmap = pd.DataFrame(heatmap_data)
-heatmap_matrix = df_heatmap.pivot(index='window_vol', columns='window_high', values='sharpe_ratio')
+        df_heatmap = pd.DataFrame(heatmap_data)
+        heatmap_matrix = df_heatmap.pivot(
+            index='window_vol',
+            columns='window_high',
+            values='sharpe_ratio'
+        )
 
-plt.figure(figsize=(12, 6))
-sns.heatmap(heatmap_matrix, annot=True, fmt=".2f", cmap='RdBu_r', center=0, cbar_kws={'label': 'Sharpe Ratio'})
-plt.title('Sharpe Ratio Sensitivity to Parameters')
-plt.xlabel('Average True Range Window')
-plt.ylabel('Max-to-Date Shift')
-plt.tight_layout()
-plt.show()
+        plt.figure(figsize=(12, 6))
+        sns.heatmap(
+            heatmap_matrix,
+            annot=True,
+            fmt=".2f",
+            cmap='RdBu_r',
+            center=0,
+            cbar_kws={'label': 'Sharpe Ratio'}
+        )
+        plt.title('Sharpe Ratio Sensitivity to Parameters')
+        plt.xlabel('Average True Range Window')
+        plt.ylabel('Max-to-Date Shift')
+        plt.tight_layout()
+        plt.show()
 
-sharpe_heatmap(np.round(np.linspace(1, 10, 20), 1).tolist(), range(2, 20))
+
+if __name__ == '__main__':
+
+    symbols = ['ADA', 'AVAX', 'BNB', 'BTC', 'DOGE', 'ETH', 'SOL', 'XRP']
+    training_df_dic, validation_df_dic = data.get_data()
+
+    dic_param = {
+        'window': 30,
+        'shift': 4,
+        'scalar': 8,
+        'take_profit': 0.10,
+        'stop_loss': 0.05
+    }
+    # Get performance metrics using strategy-toolbox.py
+    strat = MomentumBreakout(training_df_dic, '1T')
+    weight_df = strat.main(dic_param)
+  
+    metric, perf = u.strat_eval(training_df_dic, weight_df)
+    indicator = u.get_strat_metrics(metric, 'strat')
+
+    # Optimze the parameters using sharpe heatmap
+    sharpe_heatmap(np.round(np.linspace(1, 10, 20), 1).tolist(), range(2, 20))
